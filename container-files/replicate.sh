@@ -42,17 +42,19 @@ if [[ "$APP_NAME" != "" ]]; then
     echo
   elif [ -z "$pod" ]; then
 
-    psql $POSTGRES_DB -U $POSTGRES_USER -c "\
-      CREATE EXTENSION IF NOT EXISTS btree_gist; \
-      CREATE EXTENSION IF NOT EXISTS bdr; \
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "
+      CREATE EXTENSION IF NOT EXISTS btree_gist;
+      CREATE EXTENSION IF NOT EXISTS bdr;"
+
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "
       SELECT bdr.bdr_group_create(
         local_node_name := '${pod}',
         node_external_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB}'
       );"
 
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
   fi
 fi
-#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_node_join_wait_for_ready();"
 #  message
 #  log "Database started in ${MODE} mode"
 #elif [ $MODE == 'slave' ]; then
