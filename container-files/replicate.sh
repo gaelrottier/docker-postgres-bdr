@@ -19,34 +19,49 @@ message() {
   echo "============================================s============================"
 }
 
-if [ $MODE == 'master' ]; then
-  sleep 5
-  log "User Selected replication method: ${MODE}"
-  while true; do if cat /var/lib/postgresql/data/pg_log/postgresql*.log | grep "database system is ready to accept connections"; then break; else sleep 1; fi done
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS bdr;"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_group_create(
-    local_node_name := '${HOSTNAME}',
-    node_external_dsn := 'host=${HOSTNAME} port=${MASTER_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
-  );"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_node_join_wait_for_ready();"
-  message
-  log "Database started in ${MODE} mode"
-elif [ $MODE == 'slave' ]; then
-  sleep 15
-  log "User Selected replication method: ${MODE}"
-  while true; do if cat /var/lib/postgresql/data/pg_log/postgresql*.log | grep "database system is ready to accept connections"; then break; else sleep 1; fi done
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS bdr;"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_group_join(
-    local_node_name := '${HOSTNAME}',
-    node_external_dsn := 'host=${HOSTNAME} port=${SLAVE_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}',
-    join_using_dsn := 'host=${MASTER_ADDRESS} port=${MASTER_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
-  );"
-  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_node_join_wait_for_ready();"
-  message
-  log "Database started in ${MODE} mode"
-elif [ $MODE == 'single' ]; then
-  message
-  log "Database started in single mode. No replication!!!"
+sleep 5
+while true; do if cat /var/lib/postgresql/data/pg_log/postgresql*.log | grep "database system is ready to accept connections"; then break; else sleep 1; fi done
+
+if [[ "$APP_NAME" != "" ]]; then
+
+  oc config set-cluster http://kubernetes.default
+  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
+  namespace=$(oc get namespace $APP_NAME --no-headers | awk '{print $1;exit}')
+  service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
+
+  if [ "$pod" ]; then
+    #rejoindre cluster
+    echo
+  elif [ -z "$pod" ]; then
+
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "\
+      CREATE EXTENSION IF NOT EXISTS btree_gist; \
+      CREATE EXTENSION IF NOT EXISTS bdr; \
+      SELECT bdr.bdr_group_create(
+        local_node_name := '${pod}',
+        node_external_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB}'
+      );"
+
+  fi
 fi
+#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+#  message
+#  log "Database started in ${MODE} mode"
+#elif [ $MODE == 'slave' ]; then
+#  sleep 15
+#  log "User Selected replication method: ${MODE}"
+#  while true; do if cat /var/lib/postgresql/data/pg_log/postgresql*.log | grep "database system is ready to accept connections"; then break; else sleep 1; fi done
+#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS btree_gist;"
+#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "CREATE EXTENSION IF NOT EXISTS bdr;"
+#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_group_join(
+#    local_node_name := '${HOSTNAME}',
+#    node_external_dsn := 'host=${HOSTNAME} port=${SLAVE_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}',
+#    join_using_dsn := 'host=${MASTER_ADDRESS} port=${MASTER_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
+#  );"
+#  psql $POSTGRES_DB -U $POSTGRES_USER -p $POSTGRES_PORT -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+#  message
+#  log "Database started in ${MODE} mode"
+#elif [ $MODE == 'single' ]; then
+#  message
+#  log "Database started in single mode. No replication!!!"
+#fi
