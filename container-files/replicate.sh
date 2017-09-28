@@ -36,15 +36,17 @@ if [[ "$APP_NAME" != "" ]]; then
 
   oc config set-cluster http://kubernetes.default
 
-  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
+  # grep -v = not matches
+  # tac = reverse cat to join nodes with highest possible index to avoid joining only first one
+  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | tac | awk '{print $1;exit}')
   namespace=$(oc get namespace $APP_NAME --no-headers | awk '{print $1;exit}')
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
 
-  psql $POSTGRES_DB -U $POSTGRES_USER -c "
-    CREATE EXTENSION IF NOT EXISTS btree_gist;
-    CREATE EXTENSION IF NOT EXISTS bdr;"
-
   if [ "$pod" ]; then
+
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "
+      CREATE EXTENSION IF NOT EXISTS btree_gist;
+      CREATE EXTENSION IF NOT EXISTS bdr;"
 
     if [ "$pod" == $HOSTNAME ]; then
     
@@ -63,9 +65,9 @@ if [[ "$APP_NAME" != "" ]]; then
             join_using_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
           );"
 
-    fi
+        psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
 
-    psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+    fi
 
   fi
 
