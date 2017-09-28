@@ -64,6 +64,9 @@ if [[ "$APP_NAME" != "" ]]; then
 
     else
 
+        log "Sleep 10 sec again during server group creation..."
+        sleep 10
+
         log "The cluster already exists, joining server group..."
         psql $POSTGRES_DB -U $POSTGRES_USER -c "
           SELECT bdr.bdr_group_join(
