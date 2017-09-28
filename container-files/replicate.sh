@@ -32,10 +32,11 @@ while true; do
   done;
 done
 
+echo "APP_NAME : $APP_NAME"
 if [[ "$APP_NAME" != "" ]]; then
 
   oc config set-cluster http://kubernetes.default
-  echo $(oc get pod --selector=app=$APP_NAME --no-headers)
+  echo "OC GET POD : $(oc get pod --selector=app=$APP_NAME)"
   pod=$(oc get pod --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
   namespace=$(oc get namespace $APP_NAME --no-headers | awk '{print $1;exit}')
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
