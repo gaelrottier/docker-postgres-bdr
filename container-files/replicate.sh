@@ -20,7 +20,15 @@ message() {
 }
 
 sleep 5
-while true; do if cat /var/lib/postgresql/data/pg_log/postgresql*.log | grep "database system is ready to accept connections"; then break; else sleep 1; fi done
+while true; do
+  if [ -f "/var/lib/postgresql/data/pg_log/postgresql*.log" ]; then
+    if cat "/var/lib/postgresql/data/pg_log/postgresql*.log" | grep "database system is ready to accept connections"; then 
+      break;
+    fi
+  else
+    sleep 1;
+  fi
+done
 
 if [[ "$APP_NAME" != "" ]]; then
 
