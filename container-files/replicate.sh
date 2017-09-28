@@ -66,8 +66,6 @@ if [[ "$APP_NAME" != "" ]]; then
             join_using_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
           );"
 
-        psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
-
     fi
 
   fi
