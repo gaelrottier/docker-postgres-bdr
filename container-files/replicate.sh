@@ -74,6 +74,9 @@ if [[ "$APP_NAME" != "" ]]; then
 
     fi
 
+    log "Waiting for other nodes to be ready..."
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+
   fi
 
   log "Configuration done !"
