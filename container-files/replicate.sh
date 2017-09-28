@@ -36,9 +36,10 @@ if [[ "$APP_NAME" != "" ]]; then
 
   oc config set-cluster http://kubernetes.default
 
+  sleep 10
+
   # grep -v = not matches
-  # tac = reverse cat to join nodes with highest possible index to avoid joining only first one
-  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | tac | awk '{print $1;exit}')
+  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
   namespace=$(oc get namespace $APP_NAME --no-headers | awk '{print $1;exit}')
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
 
