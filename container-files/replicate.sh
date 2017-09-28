@@ -21,13 +21,15 @@ message() {
 
 sleep 5
 while true; do
-  if [ -f "/var/lib/postgresql/data/pg_log/postgresql*.log" ]; then
-    if cat "/var/lib/postgresql/data/pg_log/postgresql*.log" | grep "database system is ready to accept connections"; then 
-      break;
+  for f in /var/lib/postgresql/data/pg_log/postgresql*.log; do 
+    if [ -f $f ]; then
+      if grep "database system is ready to accept connections" $f; then 
+        break 2;
+      else
+        sleep 1;
+      fi
     fi
-  else
-    sleep 1;
-  fi
+  done;
 done
 
 if [[ "$APP_NAME" != "" ]]; then
@@ -55,6 +57,7 @@ if [[ "$APP_NAME" != "" ]]; then
     psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
   fi
 fi
+
 #  message
 #  log "Database started in ${MODE} mode"
 #elif [ $MODE == 'slave' ]; then
