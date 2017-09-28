@@ -32,7 +32,6 @@ while true; do
   done;
 done
 
-echo "APP_NAME : $APP_NAME"
 if [[ "$APP_NAME" != "" ]]; then
 
   oc config set-cluster http://kubernetes.default
