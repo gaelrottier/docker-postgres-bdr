@@ -34,23 +34,28 @@ done
 
 if [[ "$APP_NAME" != "" ]]; then
 
-  oc config set-cluster http://kubernetes.default
+  log "Configurating PostgreSQL ${PG_MAJOR} BDR Cluster"
 
+  log "Sleep 10 sec..."
   sleep 10
+
+  oc config set-cluster http://kubernetes.default
 
   # grep -v = not matches
   pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
-  namespace=$(oc get namespace $APP_NAME --no-headers | awk '{print $1;exit}')
+  namespace=$APP_NAME
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
 
   if [ "$pod" ]; then
 
+    log "Creating extensions..."
     psql $POSTGRES_DB -U $POSTGRES_USER -c "
       CREATE EXTENSION IF NOT EXISTS btree_gist;
       CREATE EXTENSION IF NOT EXISTS bdr;"
 
     if [ "$pod" == $HOSTNAME ]; then
     
+        log "First node in the cluster, creating server group..."
         psql $POSTGRES_DB -U $POSTGRES_USER -c "
           SELECT bdr.bdr_group_create(
             local_node_name := '${HOSTNAME}',
@@ -59,6 +64,7 @@ if [[ "$APP_NAME" != "" ]]; then
 
     else
 
+        log "The cluster already exists, joining server group..."
         psql $POSTGRES_DB -U $POSTGRES_USER -c "
           SELECT bdr.bdr_group_join(
             local_node_name := '${HOSTNAME}',
@@ -69,5 +75,7 @@ if [[ "$APP_NAME" != "" ]]; then
     fi
 
   fi
+
+  log "Configuration done !"
 
 fi
