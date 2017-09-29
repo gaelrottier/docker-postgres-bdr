@@ -37,10 +37,10 @@ objects:
         labels:
           app: "${APP_NAME}"
       spec:
-        terminationGrapePeriodSeconds: 30
+        terminationGrapePeriodSeconds: 5
         containers:
         - name: "${APP_NAME}"
-          image: gaelrottier/docker-postgres-bdr:v1.0.0
+          image: gaelrottier/docker-postgres-bdr:dev
           ports:
           - containerPort: 5432
             name: psql
