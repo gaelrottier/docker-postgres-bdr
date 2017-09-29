@@ -40,7 +40,7 @@ objects:
         terminationGrapePeriodSeconds: 30
         containers:
         - name: "${APP_NAME}"
-          image: gaelrottier/docker-postgres-bdr:dev
+          image: gaelrottier/docker-postgres-bdr:v1.0.0
           ports:
           - containerPort: 5432
             name: psql
