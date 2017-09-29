@@ -37,7 +37,7 @@ objects:
         labels:
           app: "${APP_NAME}"
       spec:
-        terminationGrapePeriodSeconds: 5
+        terminationGracePeriodSeconds: 5
         containers:
         - name: "${APP_NAME}"
           image: gaelrottier/docker-postgres-bdr:dev
@@ -63,6 +63,21 @@ objects:
                   name: "${APP_NAME}-secret"
                   key: POSTGRES_USER
           imagePullPolicy: Always
+          readinessProbe:
+            timeoutSeconds: 1
+            initialDelaySeconds: 15
+            exec:
+              command:
+              - "/bin/sh"
+              - "-i"
+              - "-c"
+              - psql -h 127.0.0.1 -U $POSTGRES_USER -q -d $POSTGRES_DATABASE -c
+                'SELECT 1'
+          livenessProbe:
+            timeoutSeconds: 1
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 5432
         serviceAccount: postgres
         serviceAccountName: postgres
     volumeClaimTemplates:
