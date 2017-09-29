@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Template
+metadata:
+  annotations:
+    description: "Replicated PostgreSQL BDR template"
+    tags: database,postgresql,postgresql-bdr
+    iconClass: "icon-postgresql"
+  name: postgres-bdr-cluster
+
+objects:
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${APP_NAME}"
+    labels:
+      app: "${APP_NAME}"
+  spec:
+    ports:
+      - port: 5432
+        name: psql
+    clusterIP: None
+    selector:
+      app: "${APP_NAME}"
+
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    name: "${APP_NAME}"
+    labels:
+      app: "${APP_NAME}"
+  spec:
+    serviceName: "${APP_NAME}"
+    replicas: 3
+    template:
+      metadata:
+        labels:
+          app: "${APP_NAME}"
+      spec:
+        terminationGrapePeriodSeconds: 30
+        containers:
+        - name: "${APP_NAME}"
+          image: gaelrottier/docker-postgres-bdr
+          ports:
+          - containerPort: 5432
+            name: psql
+          volumeMounts:
+          - name: "${APP_NAME}"
+            mountPath: /var/lib/postgresql/data
+          env:
+            - name: APP_NAME
+              value: "${APP_NAME}"
+            - name: POSTGRES_PASSWORD
+              value: "${POSTGRES_PASSWORD}"
+            - name: POSTGRES_DB
+              value: "${POSTGRES_DB}"
+            - name: POSTGRES_USER
+              value: "${POSTGRES_USER}"
+          imagePullPolicy: Always
+    volumeClaimTemplates:
+    - metadata:
+        name: "${APP_NAME}"
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        # For Minishift
+        storageClassName: ""
+        resources:
+          requests:
+            storage: 2Gi
+
+parameters:
+  - name: APP_NAME
+    value: persee
+  - name: POSTGRES_PASSWORD
+    value: persee
+  - name: POSTGRES_DB
+    value: persee
+  - name: POSTGRES_USER
+    value: persee
