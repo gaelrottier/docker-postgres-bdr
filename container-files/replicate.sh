@@ -39,7 +39,7 @@ if [[ "$APP_NAME" != "" ]]; then
   oc config set-cluster http://kubernetes.default
 
   pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
-  namespace=$APP_NAME
+  namespace=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
   host="${service}.${namespace}.svc.cluster.local"
   connectionString="port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
