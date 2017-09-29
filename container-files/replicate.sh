@@ -41,7 +41,8 @@ if [[ "$APP_NAME" != "" ]]; then
   pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
   namespace=$APP_NAME
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
-
+  host="${service}.${namespace}.svc.cluster.local"
+  connectionString="port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
 
   log "Creating extensions..."
   psql $POSTGRES_DB -U $POSTGRES_USER -c "
@@ -58,8 +59,8 @@ if [[ "$APP_NAME" != "" ]]; then
     psql $POSTGRES_DB -U $POSTGRES_USER -c "
       SELECT bdr.bdr_group_join(
         local_node_name := '${HOSTNAME}',
-        node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}',
-        join_using_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
+        node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}',
+        join_using_dsn := 'host=${pod}.${host} ${connectionString}'
       );"
 
   else
@@ -69,7 +70,7 @@ if [[ "$APP_NAME" != "" ]]; then
     psql $POSTGRES_DB -U $POSTGRES_USER -c "
       SELECT bdr.bdr_group_create(
         local_node_name := '${HOSTNAME}',
-        node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
+        node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}'
       );"
 
   fi
