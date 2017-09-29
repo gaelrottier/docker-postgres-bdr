@@ -40,7 +40,7 @@ objects:
         terminationGrapePeriodSeconds: 30
         containers:
         - name: "${APP_NAME}"
-          image: gaelrottier/docker-postgres-bdr
+          image: gaelrottier/docker-postgres-bdr:dev
           ports:
           - containerPort: 5432
             name: psql
@@ -49,14 +49,16 @@ objects:
             mountPath: /var/lib/postgresql/data
           env:
             - name: APP_NAME
-              value: "${APP_NAME}"
+              value: ${APP_NAME}
             - name: POSTGRES_PASSWORD
-              value: "${POSTGRES_PASSWORD}"
+              value: ${POSTGRES_PASSWORD}
             - name: POSTGRES_DB
-              value: "${POSTGRES_DB}"
+              value: ${POSTGRES_DB}
             - name: POSTGRES_USER
-              value: "${POSTGRES_USER}"
+              value: ${POSTGRES_USER}
           imagePullPolicy: Always
+        serviceAccount: postgres
+        serviceAccountName: postgres
     volumeClaimTemplates:
     - metadata:
         name: "${APP_NAME}"
