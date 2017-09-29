@@ -51,11 +51,17 @@ objects:
             - name: APP_NAME
               value: ${APP_NAME}
             - name: POSTGRES_PASSWORD
-              value: ${POSTGRES_PASSWORD}
+              valueFrom:
+                secretKeyRef:
+                  name: "${APP_NAME}-secret"
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               value: ${POSTGRES_DB}
             - name: POSTGRES_USER
-              value: ${POSTGRES_USER}
+              valueFrom:
+                secretKeyRef:
+                  name: "${APP_NAME}-secret"
+                  key: POSTGRES_USER
           imagePullPolicy: Always
         serviceAccount: postgres
         serviceAccountName: postgres
@@ -71,12 +77,26 @@ objects:
           requests:
             storage: 2Gi
 
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: "${APP_NAME}-secret"
+    labels:
+      app: ${APP_NAME}
+  stringData:
+    POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    POSTGRES_USER: "${POSTGRES_USER}"
+
 parameters:
   - name: APP_NAME
     value: persee
   - name: POSTGRES_PASSWORD
-    value: persee
+    description: password used by postgresql bdr
+    generate: expression
+    from: "[a-z0-9]{16}"
   - name: POSTGRES_DB
     value: persee
   - name: POSTGRES_USER
-    value: persee
+    description: password used by postgresql bdr
+    generate: expression
+    from: "[a-z0-9]{16}"
