@@ -36,9 +36,6 @@ if [[ "$APP_NAME" != "" ]]; then
 
   log "Configurating PostgreSQL ${PG_MAJOR} BDR Cluster"
 
-  log "Sleep 10 sec..."
-  sleep 10
-
   oc config set-cluster http://kubernetes.default
 
   # grep -v = not matches
@@ -64,7 +61,7 @@ if [[ "$APP_NAME" != "" ]]; then
 
     else
 
-        log "Sleep 10 sec again during server group creation..."
+        log "Sleep 10 sec during server group creation..."
         sleep 10
 
         log "The cluster already exists, joining server group..."
