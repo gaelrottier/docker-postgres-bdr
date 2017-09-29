@@ -38,46 +38,45 @@ if [[ "$APP_NAME" != "" ]]; then
 
   oc config set-cluster http://kubernetes.default
 
-  # grep -v = not matches
   pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
   namespace=$APP_NAME
   service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
 
-  if [ "$pod" ]; then
 
-    log "Creating extensions..."
+  log "Creating extensions..."
+  psql $POSTGRES_DB -U $POSTGRES_USER -c "
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+    CREATE EXTENSION IF NOT EXISTS bdr;"
+
+  if [ "$pod" -a "$HOSTNAME" != "$APP_NAME-0" ]; then
+
+    log "The cluster already exists, joining server group..."
+
+    log "Sleep 10 sec waiting for server group creation..."
+    sleep 10
+
     psql $POSTGRES_DB -U $POSTGRES_USER -c "
-      CREATE EXTENSION IF NOT EXISTS btree_gist;
-      CREATE EXTENSION IF NOT EXISTS bdr;"
+      SELECT bdr.bdr_group_join(
+        local_node_name := '${HOSTNAME}',
+        node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}',
+        join_using_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
+      );"
 
-    if [ "$pod" == $HOSTNAME ]; then
-    
-        log "First node in the cluster, creating server group..."
-        psql $POSTGRES_DB -U $POSTGRES_USER -c "
-          SELECT bdr.bdr_group_create(
-            local_node_name := '${HOSTNAME}',
-            node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
-          );"
+  else
 
-    else
-
-        log "Sleep 10 sec during server group creation..."
-        sleep 10
-
-        log "The cluster already exists, joining server group..."
-        psql $POSTGRES_DB -U $POSTGRES_USER -c "
-          SELECT bdr.bdr_group_join(
-            local_node_name := '${HOSTNAME}',
-            node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}',
-            join_using_dsn := 'host=${pod}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
-          );"
-
-    fi
-
-    log "Waiting for other nodes to be ready..."
-    psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+  # First node creates the cluster
+    log "First node in the cluster, creating server group..."
+    psql $POSTGRES_DB -U $POSTGRES_USER -c "
+      SELECT bdr.bdr_group_create(
+        local_node_name := '${HOSTNAME}',
+        node_external_dsn := 'host=${HOSTNAME}.${service}.${namespace}.svc.cluster.local port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}'
+      );"
 
   fi
+
+  log "Waiting for other nodes to be ready..."
+  psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+
 
   log "Configuration done !"
 
