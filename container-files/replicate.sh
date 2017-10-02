@@ -10,15 +10,6 @@ log() {
   else echo; fi
 }
 
-message() {
-  echo "========================================================================"
-  echo "    You can now connect to this PostgreSQL Server using:                "
-  echo "    psql -U $POSTGRES_USER -W $POSTGRES_PASSWORD -h<host> --port $POSTGRES_PORT"
-  echo "                                                                        "
-  echo "    For security reasons, you might want to change the above password.  "
-  echo "============================================s============================"
-}
-
 sleep 5
 while true; do
   for f in /var/lib/postgresql/data/pg_log/postgresql*.log; do 
