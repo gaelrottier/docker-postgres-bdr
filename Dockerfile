@@ -25,7 +25,7 @@ RUN \
   cp $outdir/oc /usr/bin ; \
   chmod +x /usr/bin/oc ; \
   rm -rf $outdir ; \
-  rm -rf /var/cache/yum 
+  rm -rf /var/cache/yum
 
 COPY container-files/ /
 

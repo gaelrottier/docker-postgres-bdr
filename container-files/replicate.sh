@@ -32,53 +32,50 @@ while true; do
   done;
 done
 
-if [[ "$APP_NAME" != "" ]]; then
+log "Configurating PostgreSQL ${PG_MAJOR} BDR Cluster"
 
-  log "Configurating PostgreSQL ${PG_MAJOR} BDR Cluster"
+oc config set-cluster http://kubernetes.default
 
-  oc config set-cluster http://kubernetes.default
+namespace=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
+host="${service}.${namespace}.svc.cluster.local"
+connectionString="port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
 
-  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
-  namespace=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-  service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
-  host="${service}.${namespace}.svc.cluster.local"
-  connectionString="port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
+log "Creating extensions..."
+psql $POSTGRES_DB -U $POSTGRES_USER -c "
+  CREATE EXTENSION IF NOT EXISTS btree_gist;
+  CREATE EXTENSION IF NOT EXISTS bdr;"
 
-  log "Creating extensions..."
-  psql $POSTGRES_DB -U $POSTGRES_USER -c "
-    CREATE EXTENSION IF NOT EXISTS btree_gist;
-    CREATE EXTENSION IF NOT EXISTS bdr;"
-
-  if [ "$pod" -a "$HOSTNAME" != "$APP_NAME-0" ]; then
-
-    log "The cluster already exists, joining server group..."
-
-    log "Sleep 10 sec waiting for server group creation..."
-    sleep 10
-
-    psql $POSTGRES_DB -U $POSTGRES_USER -c "
-      SELECT bdr.bdr_group_join(
-        local_node_name := '${HOSTNAME}',
-        node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}',
-        join_using_dsn := 'host=${pod}.${host} ${connectionString}'
-      );"
-
-  else
+# First node created by StatefulSet, becomes first master
+if [ "$HOSTNAME" == "$APP_NAME-0" ]; then
 
   # First node creates the cluster
-    log "First node in the cluster, creating server group..."
-    psql $POSTGRES_DB -U $POSTGRES_USER -c "
-      SELECT bdr.bdr_group_create(
-        local_node_name := '${HOSTNAME}',
-        node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}'
-      );"
+  log "First node in the cluster, creating server group..."
+  psql $POSTGRES_DB -U $POSTGRES_USER -c "
+    SELECT bdr.bdr_group_create(
+      local_node_name := '${HOSTNAME}',
+      node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}'
+    );"
 
-  fi
+else
 
-  log "Waiting for other nodes to be ready..."
-  psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+  log "The cluster already exists, joining server group..."
+  log "Sleep 10 sec waiting for server group creation..."
+  sleep 10
 
+  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
 
-  log "Configuration done !"
+  psql $POSTGRES_DB -U $POSTGRES_USER -c "
+    SELECT bdr.bdr_group_join(
+      local_node_name := '${HOSTNAME}',
+      node_external_dsn := 'host=${HOSTNAME}.${host} ${connectionString}',
+      join_using_dsn := 'host=${pod}.${host} ${connectionString}'
+    );"
 
 fi
+
+log "Waiting for other nodes to be ready..."
+psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
+
+
+log "Configuration done !"
