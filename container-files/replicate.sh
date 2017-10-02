@@ -36,6 +36,7 @@ log "Configurating PostgreSQL ${PG_MAJOR} BDR Cluster"
 
 oc config set-cluster http://kubernetes.default
 
+pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
 namespace=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 service=$(oc get svc --selector=app=$APP_NAME --no-headers | awk '{print $1;exit}')
 host="${service}.${namespace}.svc.cluster.local"
@@ -47,7 +48,8 @@ psql $POSTGRES_DB -U $POSTGRES_USER -c "
   CREATE EXTENSION IF NOT EXISTS bdr;"
 
 # First node created by StatefulSet, becomes first master
-if [ "$HOSTNAME" == "$APP_NAME-0" ]; then
+# If $pod is not empty, other nodes exist, so it means the cluster is already set up
+if [ -z "$pod" -o "$HOSTNAME" == "$APP_NAME-0" ]; then
 
   # First node creates the cluster
   log "First node in the cluster, creating server group..."
@@ -62,8 +64,6 @@ else
   log "The cluster already exists, joining server group..."
   log "Sleep 10 sec waiting for server group creation..."
   sleep 10
-
-  pod=$(oc get pod --selector=app=$APP_NAME --no-headers | grep -v $HOSTNAME | sort -R  | awk '$3 == "Running" {print $1;exit}')
 
   psql $POSTGRES_DB -U $POSTGRES_USER -c "
     SELECT bdr.bdr_group_join(
