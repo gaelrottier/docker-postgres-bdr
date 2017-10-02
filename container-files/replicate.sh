@@ -53,8 +53,6 @@ if [ -z "$pod" -o "$HOSTNAME" == "$APP_NAME-0" ]; then
 else
 
   log "The cluster already exists, joining server group..."
-  log "Sleep 10 sec waiting for server group creation..."
-  sleep 10
 
   psql $POSTGRES_DB -U $POSTGRES_USER -c "
     SELECT bdr.bdr_group_join(
@@ -64,9 +62,5 @@ else
     );"
 
 fi
-
-log "Waiting for other nodes to be ready..."
-psql $POSTGRES_DB -U $POSTGRES_USER -c "SELECT bdr.bdr_node_join_wait_for_ready();"
-
 
 log "Configuration done !"
