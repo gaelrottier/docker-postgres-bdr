@@ -97,7 +97,7 @@ objects:
         spec:
           containers:
             - name: ${APPLICATION_NAME}
-              image: gaelrottier/postgres-bdr
+              image: gaelrottier/docker-postgres-bdr:v1.2.0
               env:
                 - 
                   name: APP_NAME
@@ -159,7 +159,7 @@ objects:
                 initialDelaySeconds: 15
                 timeoutSeconds: 1
               resources: {}
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent
           securityContext:
             fsGroup: 26
           serviceAccount: ${APPLICATION_NAME}
