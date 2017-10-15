@@ -27,26 +27,6 @@ if [ "${1:0:1}" = '-' ]; then
 	set -- postgres "$@"
 fi
 
-# allow the container to be started with `--user`
-if [ "$1" = 'postgres' ] && [ "$(id -u)" = '0' ]; then
-	mkdir -p "$PGDATA"
-	chown -R postgres "$PGDATA"
-	chmod 700 "$PGDATA"
-
-	mkdir -p /var/run/postgresql
-	chown -R postgres /var/run/postgresql
-	chmod 775 /var/run/postgresql
-
-	# Create the transaction log directory before initdb is run (below) so the directory is owned by the correct user
-	if [ "$POSTGRES_INITDB_XLOGDIR" ]; then
-		mkdir -p "$POSTGRES_INITDB_XLOGDIR"
-		chown -R postgres "$POSTGRES_INITDB_XLOGDIR"
-		chmod 700 "$POSTGRES_INITDB_XLOGDIR"
-	fi
-
-	exec "$BASH_SOURCE" "$@"
-fi
-
 if [ "$1" = 'postgres' ]; then
 #	mkdir -p "$PGDATA"
 #	chown -R "$(id -u)" "$PGDATA" 2>/dev/null || :
@@ -100,23 +80,21 @@ if [ "$1" = 'postgres' ]; then
 			echo "client_encoding = utf8";
 			echo "wal_level = 'logical'";
 			echo "track_commit_timestamp = on";
-			echo "max_wal_senders = 10";
-			echo "max_replication_slots = 10";
-			echo "max_worker_processes = 10";
+			echo "max_wal_senders = ${REPLICAS}";
+			echo "max_replication_slots = ${REPLICAS}";
+			echo "max_worker_processes = ${REPLICAS}";
 			echo "log_filename = 'postgresql-%y%m%d%H%M%S.log'";
 			echo "listen_addresses = '*'"
     	} >> "$PGDATA"/postgresql.conf
 
-		# internal start of server in order to allow set-up using psql-client
-		# does not listen on external TCP/IP and waits until start finishes
 		PGUSER="${PGUSER:-postgres}" \
 		pg_ctl -D "$PGDATA" \
-			-o "-c listen_addresses='*'" \
+		    -o "-c listen_addresses='*'" \
 			-w start
 
 		file_env 'POSTGRES_USER' 'postgres'
 		file_env 'POSTGRES_DB' "$POSTGRES_USER"
-
+		
 		psql=( psql -v ON_ERROR_STOP=1 )
 
 		if [ "$POSTGRES_DB" != 'postgres' ]; then
