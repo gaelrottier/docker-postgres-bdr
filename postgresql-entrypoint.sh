@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
 # usage: file_env VAR [DEFAULT]
 #    ie: file_env 'XYZ_DB_PASSWORD' 'example'
@@ -31,7 +31,9 @@ if [ "$1" = 'postgres' ]; then
 #	mkdir -p "$PGDATA"
 #	chown -R "$(id -u)" "$PGDATA" 2>/dev/null || :
 #	chmod 700 "$PGDATA" 2>/dev/null || :
+echo
 
+echo
 	# look specifically for PG_VERSION, as it is expected in the DB dir
 	if [ ! -s "$PGDATA/PG_VERSION" ]; then
 		file_env 'POSTGRES_INITDB_ARGS'
@@ -74,15 +76,17 @@ if [ "$1" = 'postgres' ]; then
 			echo "host    replication   all     all     	$authMethod";
     	} >> "$PGDATA"/pg_hba.conf
 
+        MAX_SLOTS=$( [ "$REPLICAS" -gt "10" ] && echo "$(( REPLICAS + 1 ))" || echo "10" )
+
 		{ 
 			echo;
 			echo "shared_preload_libraries = 'bdr'";
 			echo "client_encoding = utf8";
 			echo "wal_level = 'logical'";
 			echo "track_commit_timestamp = on";
-			echo "max_wal_senders = ${REPLICAS}";
-			echo "max_replication_slots = ${REPLICAS}";
-			echo "max_worker_processes = ${REPLICAS}";
+			echo "max_wal_senders = ${MAX_SLOTS}";
+			echo "max_replication_slots = ${MAX_SLOTS}";
+			echo "max_worker_processes = ${MAX_SLOTS}";
 			echo "log_filename = 'postgresql-%y%m%d%H%M%S.log'";
 			echo "listen_addresses = '*'"
     	} >> "$PGDATA"/postgresql.conf
