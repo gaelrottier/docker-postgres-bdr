@@ -27,20 +27,24 @@ if [ "${1:0:1}" = '-' ]; then
 	set -- postgres "$@"
 fi
 
+
+
 if [ "$1" = 'postgres' ]; then
 #	mkdir -p "$PGDATA"
 #	chown -R "$(id -u)" "$PGDATA" 2>/dev/null || :
 #	chmod 700 "$PGDATA" 2>/dev/null || :
 echo
-
-echo
 	# look specifically for PG_VERSION, as it is expected in the DB dir
 	if [ ! -s "$PGDATA/PG_VERSION" ]; then
+
 		file_env 'POSTGRES_INITDB_ARGS'
 		if [ "$POSTGRES_INITDB_XLOGDIR" ]; then
 			export POSTGRES_INITDB_ARGS="$POSTGRES_INITDB_ARGS --xlogdir $POSTGRES_INITDB_XLOGDIR"
 		fi
 		eval "initdb --username=postgres $POSTGRES_INITDB_ARGS"
+
+	    # Save postgresql.conf
+	    cp $PGDATA/postgresql.conf $PGDATA/postgresql.conf.template
 
 		# check password first so we can output the warning before postgres
 		# messes it up
@@ -76,20 +80,11 @@ echo
 			echo "host    replication   all     all     	$authMethod";
     	} >> "$PGDATA"/pg_hba.conf
 
-        MAX_SLOTS=$( [ "$REPLICAS" -gt "10" ] && echo "$(( REPLICAS + 1 ))" || echo "10" )
-
-		{ 
-			echo;
-			echo "shared_preload_libraries = 'bdr'";
-			echo "client_encoding = utf8";
-			echo "wal_level = 'logical'";
-			echo "track_commit_timestamp = on";
-			echo "max_wal_senders = ${MAX_SLOTS}";
-			echo "max_replication_slots = ${MAX_SLOTS}";
-			echo "max_worker_processes = ${MAX_SLOTS}";
-			echo "log_filename = 'postgresql-%y%m%d%H%M%S.log'";
-			echo "listen_addresses = '*'"
-    	} >> "$PGDATA"/postgresql.conf
+        {
+            echo;
+            cat /postgres-conf/postgresql.conf 
+        } >> $PGDATA/postgresql.conf
+        cat $PGDATA/postgresql.conf
 
 		PGUSER="${PGUSER:-postgres}" \
 		pg_ctl -D "$PGDATA" \
@@ -137,6 +132,16 @@ echo
 		echo
 		echo 'PostgreSQL init process complete; ready for start up.'
 		echo
+		
+    else
+      # Replace old postgresql.conf by new
+      mv "$PGDATA"/postgresql.conf.template "$PGDATA"/postgresql.conf
+
+      {
+          echo;
+          cat /postgres-conf/postgresql.conf 
+      } >> $PGDATA/postgresql.conf
+
 	fi
 fi
 

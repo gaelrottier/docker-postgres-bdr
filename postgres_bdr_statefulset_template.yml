@@ -36,7 +36,7 @@ parameters:
     name: POSTGRES_BDR_REPLICAS
     displayName: PostgreSQL BDR replicas count
     description: Number of PostgreSQL BDR database replicas at startup.
-    value: "20"
+    value: "4"
     required: true
   -
     name: VOLUME_CAPACITY
@@ -136,6 +136,8 @@ objects:
               volumeMounts:
                 - name: ${APPLICATION_NAME}
                   mountPath: /var/lib/pgsql/data
+                - name: postgres-conf
+                  mountPath: /postgres-conf
               readinessProbe:
                 timeoutSeconds: 5
                 initialDelaySeconds: 15
@@ -157,13 +159,20 @@ objects:
                 initialDelaySeconds: 15
                 timeoutSeconds: 1
               resources: {}
-              imagePullPolicy: IfNotPresent
+              imagePullPolicy: Always
           securityContext:
             fsGroup: 26
           serviceAccount: ${APPLICATION_NAME}
           serviceAccountName: ${APPLICATION_NAME}
           restartPolicy: Always
           terminationGracePeriodSeconds: 30
+          volumes:
+            - name: postgres-conf
+              configMap:
+                  name: ${APPLICATION_NAME}
+                  items:
+                      - key: postgresql.conf
+                        path: postgresql.conf
       volumeClaimTemplates:
         - metadata:
             name: ${APPLICATION_NAME}
@@ -175,6 +184,23 @@ objects:
             resources:
               requests:
                 storage: ${VOLUME_CAPACITY}
+
+  -
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+        name: ${APPLICATION_NAME}
+    data:
+        postgresql.conf: |-
+            shared_preload_libraries = 'bdr'
+            client_encoding = utf8
+            wal_level = 'logical'
+            track_commit_timestamp = on
+            max_wal_senders = 10
+            max_replication_slots = 10
+            max_worker_processes = 10
+            log_filename = 'postgresql-%y%m%d%H%M%S.log'
+            listen_addresses = '*'
 
   -
     apiVersion: v1
