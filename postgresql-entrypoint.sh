@@ -134,7 +134,7 @@ echo
 		
     else
       # Replace old postgresql.conf by new
-      mv "$PGDATA"/postgresql.conf.template "$PGDATA"/postgresql.conf
+      cp "$PGDATA"/postgresql.conf.template "$PGDATA"/postgresql.conf
 
       {
           echo;

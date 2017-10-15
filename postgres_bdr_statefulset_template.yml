@@ -199,6 +199,7 @@ objects:
             max_wal_senders = 10
             max_replication_slots = 10
             max_worker_processes = 10
+            max_connections = 100
             log_filename = 'postgresql-%y%m%d%H%M%S.log'
             listen_addresses = '*'
 
@@ -210,7 +211,6 @@ objects:
       labels:
         app: ${APPLICATION_NAME}
     spec:
-      clusterIP: None
       ports:
         -
           name: postgresqldb
