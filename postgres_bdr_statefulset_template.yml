@@ -1,117 +1,221 @@
 apiVersion: v1
 kind: Template
 metadata:
+  name: postgresql-bdr-template
   annotations:
-    description: "Replicated PostgreSQL BDR template"
-    tags: database,postgresql,postgresql-bdr
-    iconClass: "icon-postgresql"
-  name: postgres-bdr-cluster
+    description: This template defines objects that are required to spin up a postgresqldb bdr statefulset
+    tags: db, postgresql, postgresql-bdr 
+    openshift.io/display-name: postgresqldb-bdr-template
+    openshift.io/long-description: "This template provides objects that are required to spin up a postgresqldb bdr statefulset."
+parameters:
+  -
+    name: APPLICATION_NAME
+    value: postgresqlbdr
+    description: Name of the application
+    required: true
+  -
+    name: POSTGRESQL_USER
+    displayName: PostgreSQL Connection Username
+    description: Username for PostgreSQL user that will be used for accessing the database.
+    value: pguser
+    required: true
+  -
+    name: POSTGRESQL_PASSWORD
+    displayName: PostgreSQL Connection Password
+    description: Password for the PostgreSQL connection user.
+    generate: expression
+    from: "[a-zA-Z0-9]{16}"
+    required: true
+  -
+    name: DATABASE_NAME
+    displayName: PostgreSQL Database Name
+    description: Name of the PostgreSQL database accessed.
+    value: postgresdb
+    required: true
+  -
+    name: POSTGRES_BDR_REPLICAS
+    displayName: PostgreSQL BDR replicas count
+    description: Number of PostgreSQL BDR database replicas at startup.
+    value: "4"
+    required: true
+  -
+    name: VOLUME_CAPACITY
+    displayName: Volume Capacity
+    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    value: 1Gi
+    required: true
 
 objects:
-
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: "${APP_NAME}"
-    labels:
-      app: "${APP_NAME}"
-  spec:
-    ports:
-      - port: 5432
-        name: psql
-    clusterIP: None
-    selector:
-      app: "${APP_NAME}"
-
-- apiVersion: apps/v1beta1
-  kind: StatefulSet
-  metadata:
-    name: "${APP_NAME}"
-    labels:
-      app: "${APP_NAME}"
-  spec:
-    serviceName: "${APP_NAME}"
-    replicas: 3
-    template:
-      metadata:
+  - 
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+        name: ${APPLICATION_NAME}
         labels:
-          app: "${APP_NAME}"
-      spec:
-        terminationGracePeriodSeconds: 5
-        containers:
-        - name: "${APP_NAME}"
-          image: gaelrottier/docker-postgres-bdr:v1.1.0
-          ports:
-          - containerPort: 5432
-            name: psql
-          volumeMounts:
-          - name: "${APP_NAME}"
-            mountPath: /var/lib/postgresql/data
-          env:
-            - name: APP_NAME
-              value: ${APP_NAME}
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: "${APP_NAME}-secret"
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_DB
-              value: ${POSTGRES_DB}
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: "${APP_NAME}-secret"
-                  key: POSTGRES_USER
-          imagePullPolicy: Always
-          readinessProbe:
-            timeoutSeconds: 1
-            initialDelaySeconds: 15
-            exec:
-              command:
-              - "/bin/sh"
-              - "-i"
-              - "-c"
-              - psql -h 127.0.0.1 -U $POSTGRES_USER -q -d $POSTGRES_DATABASE -c
-                'SELECT 1'
-          livenessProbe:
-            timeoutSeconds: 1
-            initialDelaySeconds: 30
-            tcpSocket:
-              port: 5432
-        serviceAccount: postgres
-        serviceAccountName: postgres
-    volumeClaimTemplates:
-    - metadata:
-        name: "${APP_NAME}"
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        # For Minishift
-        storageClassName: ""
-        resources:
-          requests:
-            storage: 2Gi
+            app: ${APPLICATION_NAME}
+    displayName: Application Name
 
-- apiVersion: v1
-  kind: Secret
-  metadata:
-    name: "${APP_NAME}-secret"
-    labels:
-      app: ${APP_NAME}
-  stringData:
-    POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-    POSTGRES_USER: "${POSTGRES_USER}"
+  -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ${APPLICATION_NAME} 
+    stringData:
+      database-user: "${POSTGRESQL_USER}"
+      database-password: "${POSTGRESQL_PASSWORD}"
 
-parameters:
-  - name: APP_NAME
-    value: persee
-  - name: POSTGRES_PASSWORD
-    description: password used by postgresql bdr
-    generate: expression
-    from: "[a-z0-9]{16}"
-  - name: POSTGRES_DB
-    value: persee
-  - name: POSTGRES_USER
-    description: password used by postgresql bdr
-    generate: expression
-    from: "[a-z0-9]{16}"
+  -
+    apiVersion: apps/v1beta1
+    kind: StatefulSet
+    metadata:
+      name: ${APPLICATION_NAME}
+      labels:
+        app: ${APPLICATION_NAME}
+    spec:
+# This is to define the deployment strategy (either be Rolling or Recreate)
+#     strategy:
+#       type: Rolling
+#       rollingParams:
+#         updatePeriodSeconds: 1
+#         intervalSeconds: 1
+#         timeoutSeconds: 600
+#         maxUnavailable: 25%
+#         maxSurge: 25%
+#       resources:
+      serviceName: ${APPLICATION_NAME}
+      triggers:
+        -
+          type: ConfigChange
+      replicas: ${POSTGRES_BDR_REPLICAS}
+      selector:
+        matchLabels:
+          app: ${APPLICATION_NAME}
+      template:
+        metadata:
+          labels:
+            app: ${APPLICATION_NAME}
+        spec:
+          containers:
+            - name: ${APPLICATION_NAME}
+              image: gaelrottier/postgres-bdr
+              env:
+                - 
+                  name: APP_NAME
+                  value: ${APPLICATION_NAME}
+                - 
+                  name: POSTGRES_DB
+                  value: ${DATABASE_NAME}
+                - 
+                  name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${APPLICATION_NAME}
+                      key: database-user
+                - 
+                  name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${APPLICATION_NAME}
+                      key: database-password
+                - 
+                  name: OC_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - 
+                  name: POD_IP 
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - 
+                  name: REPLICAS
+                  value: ${POSTGRES_BDR_REPLICAS}
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              volumeMounts:
+                - name: ${APPLICATION_NAME}
+                  mountPath: /var/lib/pgsql/data
+                - name: postgres-conf
+                  mountPath: /postgres-conf
+              readinessProbe:
+                timeoutSeconds: 5
+                initialDelaySeconds: 15
+                exec:
+                  command:
+                  - "/bin/sh"
+                  - "-i"
+                  - "-c"
+                  - psql -h 127.0.0.1 -U $POSTGRES_USER -q -d $POSTGRES_DB -c
+                    'SELECT bdr.bdr_node_join_wait_for_ready();'
+              livenessProbe:
+                exec:
+                  command:
+                  - "/bin/sh"
+                  - "-i"
+                  - "-c"
+                  - psql -h 127.0.0.1 -U $POSTGRES_USER -q -d $POSTGRES_DB -c
+                    'SELECT 1;'
+                initialDelaySeconds: 15
+                timeoutSeconds: 1
+              resources: {}
+              imagePullPolicy: Always
+          securityContext:
+            fsGroup: 26
+          serviceAccount: ${APPLICATION_NAME}
+          serviceAccountName: ${APPLICATION_NAME}
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          volumes:
+            - name: postgres-conf
+              configMap:
+                  name: ${APPLICATION_NAME}
+                  items:
+                      - key: postgresql.conf
+                        path: postgresql.conf
+      volumeClaimTemplates:
+        - metadata:
+            name: ${APPLICATION_NAME}
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            #For minishift
+            storageClassName: ""
+            resources:
+              requests:
+                storage: ${VOLUME_CAPACITY}
+
+  -
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+        name: ${APPLICATION_NAME}
+    data:
+        postgresql.conf: |-
+            shared_preload_libraries = 'bdr'
+            client_encoding = utf8
+            wal_level = 'logical'
+            track_commit_timestamp = on
+            max_wal_senders = 10
+            max_replication_slots = 10
+            max_worker_processes = 10
+            log_filename = 'postgresql-%y%m%d%H%M%S.log'
+            listen_addresses = '*'
+
+  -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ${APPLICATION_NAME}
+      labels:
+        app: ${APPLICATION_NAME}
+    spec:
+      clusterIP: None
+      ports:
+        -
+          name: postgresqldb
+          protocol: TCP
+          port: 5432
+          targetPort: 5432
+      selector:
+        app: ${APPLICATION_NAME}
