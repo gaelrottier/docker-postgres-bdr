@@ -37,8 +37,6 @@ EXPOSE 5432
 
 USER postgres
 
-VOLUME ["/var/lib/pgsql/data"]
-
 ENTRYPOINT [ "/postgresql-entrypoint.sh" ]
 
 CMD ["postgres"]

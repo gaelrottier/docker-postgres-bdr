@@ -133,9 +133,9 @@ objects:
               ports:
                 - containerPort: 5432
                   protocol: TCP
-          #   volumeMounts:
-          #      - name: ${APPLICATION_NAME}
-          #        mountPath: /var/lib/pgsql/data
+              volumeMounts:
+                - name: ${APPLICATION_NAME}
+                  mountPath: /var/lib/pgsql/data
               readinessProbe:
                 timeoutSeconds: 5
                 initialDelaySeconds: 15
@@ -157,14 +157,24 @@ objects:
                 initialDelaySeconds: 15
                 timeoutSeconds: 1
               resources: {}
-              imagePullPolicy: Always
-          # volumes:
-          # - name: ${APPLICATION_NAME}
-          #   emptyDir: {}
+              imagePullPolicy: IfNotPresent
+          securityContext:
+            fsGroup: 26
           serviceAccount: ${APPLICATION_NAME}
           serviceAccountName: ${APPLICATION_NAME}
           restartPolicy: Always
           terminationGracePeriodSeconds: 30
+      volumeClaimTemplates:
+        - metadata:
+            name: ${APPLICATION_NAME}
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            #For minishift
+            storageClassName: ""
+            resources:
+              requests:
+                storage: ${VOLUME_CAPACITY}
 
   -
     apiVersion: v1
