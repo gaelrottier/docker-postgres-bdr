@@ -84,7 +84,6 @@ echo
             echo;
             cat /postgres-conf/postgresql.conf 
         } >> $PGDATA/postgresql.conf
-        cat $PGDATA/postgresql.conf
 
 		PGUSER="${PGUSER:-postgres}" \
 		pg_ctl -D "$PGDATA" \
