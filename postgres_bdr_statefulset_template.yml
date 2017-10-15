@@ -97,7 +97,7 @@ objects:
         spec:
           containers:
             - name: ${APPLICATION_NAME}
-              image: gaelrottier/postgres-bdr
+              image: gaelrottier/docker-postgres-bdr:v1.3.0
               env:
                 - 
                   name: APP_NAME
